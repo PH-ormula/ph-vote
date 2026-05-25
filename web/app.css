@@ -1,0 +1,176 @@
+@font-face {
+    font-family: 'Futura';
+    src: url('/assets/fonts/futura-std/FuturaStd-Book.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Futura';
+    src: url('/assets/fonts/futura-std/FuturaStd-Bold.otf') format('opentype');
+    font-weight: bold;
+    font-style: normal;
+}
+
+:root {
+    --window-bg: #FAFAFA;
+    --header-bg: #EBEBEB;
+    --text-color: #242424;
+    --dim-text: #5E5E5E;
+    --border-color: #CDC7C2;
+    --btn-primary-bg: #3584E4;
+    --btn-primary-hover: #1C71D8;
+    --btn-primary-active: #1A5FB4;
+    --btn-primary-text: #FFFFFF;
+    --radius: 12px;
+    --btn-radius: 6px;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --window-bg: #242424;
+        --header-bg: #303030;
+        --text-color: #FFFFFF;
+        --dim-text: #9E9E9E;
+        --border-color: #1E1E1E;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Futura', system-ui, sans-serif;
+    background-color: var(--window-bg);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.adwaita-window {
+    width: 400px;
+    max-width: 90vw;
+    background-color: var(--window-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.header-bar {
+    background-color: var(--header-bg);
+    text-align: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    user-select: none;
+}
+
+.title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dim-text {
+    color: var(--dim-text);
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.input-box {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--btn-radius);
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    font-family: 'Futura', system-ui, sans-serif;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.input-box:focus {
+    outline: 2px solid var(--btn-primary-bg);
+    outline-offset: -1px;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--btn-radius);
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    border: none;
+    font-family: 'Futura', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: var(--btn-primary-hover);
+}
+
+.btn-primary:active {
+    background-color: var(--btn-primary-active);
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.radio-label input {
+    accent-color: var(--btn-primary-bg);
+    width: 18px;
+    height: 18px;
+}
+
+.message {
+    font-size: 13px;
+    text-align: center;
+    margin-top: 12px;
+    font-weight: bold;
+    color: var(--btn-primary-bg);
+}
+
+.results-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.results-list li {
+    padding: 12px;
+    background: var(--header-bg);
+    border-radius: var(--btn-radius);
+    font-weight: bold;
+}

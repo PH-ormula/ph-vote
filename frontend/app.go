@@ -1,0 +1,307 @@
+package frontend
+
+import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"net/http"
+	"net/url"
+
+	"github.com/linckode/circl/blindsign/blindrsa"
+	"github.com/maxence-charriere/go-app/v9/pkg/app"
+	"ph-vote/api"
+)
+
+type MainApp struct {
+	app.Compo
+	Config       *api.ConfigRes
+	EmailInput   string
+	Message      string
+	OTP          string
+	IsVoting     bool
+	VoteOption   string
+	Token        []byte
+	Signature    []byte
+	AdminMode    bool
+	AdminPwd     string
+	AdminResults map[string]int
+	ShowResults  bool
+	Results      map[string]int
+}
+
+func (a *MainApp) OnMount(ctx app.Context) {
+	u, _ := url.Parse(app.Window().URL().String())
+	if u.Path == "/admin" {
+		a.AdminMode = true
+		a.Update()
+		return
+	}
+
+	ctx.Async(func() {
+		resp, err := http.Get(api.PathConfig)
+		if err == nil {
+			var conf api.ConfigRes
+			if err := json.NewDecoder(resp.Body).Decode(&conf); err == nil {
+				ctx.Dispatch(func(ctx app.Context) {
+					a.Config = &conf
+					app.Window().Get("document").Set("title", conf.Title)
+					
+					// Check magic link
+					otp := u.Query().Get("otp")
+					if otp != "" {
+						a.Message = "Authenticating securely using RSA blind signatures..."
+						a.OTP = otp
+						a.Update()
+						ctx.Async(a.performBlindSignAndShowVote(ctx, otp, conf.PublicKey))
+					}
+				})
+			}
+			resp.Body.Close()
+		}
+	})
+}
+
+func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	a.Message = "Requesting magic link..."
+	email := a.EmailInput
+
+	ctx.Async(func() {
+		reqData, _ := json.Marshal(api.MagicLinkReq{Email: email})
+		resp, err := http.Post(api.PathRequestMagicLink, "application/json", bytes.NewBuffer(reqData))
+		
+		ctx.Dispatch(func(ctx app.Context) {
+			if err != nil || resp.StatusCode != 200 {
+				a.Message = "Failed to request link. Invalid suffix or already requested."
+			} else {
+				a.Message = "Magic link sent! Check your inbox (or terminal logs)."
+			}
+		})
+	})
+}
+
+func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKeyPEM []byte) func() {
+	return func() {
+		// 1. Prepare raw token (the actual vote token)
+		rawToken := make([]byte, 32)
+		rand.Read(rawToken)
+
+		// Parse Public Key
+		block, _ := pem.Decode(pubKeyPEM)
+		if block == nil {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Failed to parse server key" })
+			return
+		}
+		pubKeyAny, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Invalid public key format" })
+			return
+		}
+		
+		pubKey, ok := pubKeyAny.(*rsa.PublicKey)
+		if !ok {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Public key is not RSA" })
+			return
+		}
+
+		// 2. Blind the token
+		client, err := blindrsa.NewClient(blindrsa.SHA384PSSRandomized, pubKey)
+		if err != nil {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Crypto init failed" })
+			return
+		}
+		
+		prepared, err := client.Prepare(rand.Reader, rawToken)
+		if err != nil {
+			return
+		}
+		
+		blindedToken, state, err := client.Blind(rand.Reader, prepared)
+		if err != nil {
+			return
+		}
+
+		// 3. Send to server for signing
+		reqData, _ := json.Marshal(api.SignTokenReq{OTP: otp, BlindedToken: blindedToken})
+		resp, err := http.Post(api.PathSignToken, "application/json", bytes.NewBuffer(reqData))
+		if err != nil || resp.StatusCode != 200 {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Magic link invalid or expired" })
+			return
+		}
+
+		var res api.SignTokenRes
+		json.NewDecoder(resp.Body).Decode(&res)
+		resp.Body.Close()
+
+		// 4. Unblind signature
+		signature, err := client.Finalize(state, res.BlindedSignature)
+		if err != nil {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Failed to unblind signature" })
+			return
+		}
+
+		// Success! Save token and signature, show voting UI.
+		ctx.Dispatch(func(ctx app.Context) {
+			a.Token = prepared
+			a.Signature = signature
+			a.IsVoting = true
+			a.Message = "Authenticated. Your vote is untraceable."
+			app.Window().Get("history").Call("replaceState", nil, "", "/") // Hide OTP from URL
+		})
+	}
+}
+
+func (a *MainApp) onVote(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	if a.VoteOption == "" {
+		return
+	}
+	
+	a.Message = "Submitting vote anonymously..."
+	ctx.Async(func() {
+		reqData, _ := json.Marshal(api.VoteReq{
+			Token:     a.Token,
+			Signature: a.Signature,
+			Option:    a.VoteOption,
+		})
+		resp, err := http.Post(api.PathVote, "application/json", bytes.NewBuffer(reqData))
+		if err != nil || resp.StatusCode != 200 {
+			ctx.Dispatch(func(ctx app.Context) {
+				a.Message = "Vote failed. You may have already voted."
+			})
+			return
+		}
+
+		// Fetch results immediately
+		resResp, err := http.Get(api.PathResults)
+		if err == nil && resResp.StatusCode == 200 {
+			var resData api.AdminRes
+			json.NewDecoder(resResp.Body).Decode(&resData)
+			resResp.Body.Close()
+			ctx.Dispatch(func(ctx app.Context) {
+				a.Results = resData.Votes
+				a.ShowResults = true
+				a.IsVoting = false
+				a.Message = "Vote cast successfully!"
+			})
+		}
+	})
+}
+
+func (a *MainApp) onAdminLogin(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	ctx.Async(func() {
+		reqData, _ := json.Marshal(api.AdminReq{Password: a.AdminPwd})
+		resp, err := http.Post(api.PathAdminVotes, "application/json", bytes.NewBuffer(reqData))
+		if err == nil && resp.StatusCode == 200 {
+			var res api.AdminRes
+			json.NewDecoder(resp.Body).Decode(&res)
+			ctx.Dispatch(func(ctx app.Context) {
+				a.AdminResults = res.Votes
+			})
+		} else {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Invalid password" })
+		}
+	})
+}
+
+func (a *MainApp) Render() app.UI {
+	if a.AdminMode {
+		return a.renderAdmin()
+	}
+
+	var options []string
+	if a.Config != nil {
+		options = a.Config.Options
+	}
+
+	return app.Div().Class("adwaita-window").Body(
+		app.Div().Class("header-bar").Body(
+			app.H1().Class("title").Text(a.getTitle()),
+		),
+		app.Div().Class("content").Body(
+			app.If(a.ShowResults,
+				app.H2().Text("Current Standings"),
+				app.Ul().Class("results-list").Body(
+					a.renderPublicResults(),
+				),
+				app.P().Class("message").Text(a.Message),
+			).ElseIf(a.IsVoting,
+				app.Form().OnSubmit(a.onVote).Body(
+					app.P().Class("dim-text").Text(a.Message),
+					app.Div().Class("radio-group").Body(
+						app.Range(options).Slice(func(i int) app.UI {
+							opt := options[i]
+							return app.Label().Class("radio-label").Body(
+								app.Input().Type("radio").Name("voteOpt").Value(opt).OnClick(func(ctx app.Context, e app.Event) {
+									a.VoteOption = opt
+								}),
+								app.Span().Text(opt),
+							)
+						}),
+					),
+					app.Button().Class("btn-primary").Type("submit").Text("Submit Vote"),
+				),
+			).Else(
+				app.Form().OnSubmit(a.onRequestLink).Body(
+					app.P().Class("dim-text").Text("Enter your email to receive an anonymous voting link."),
+					app.Input().Class("input-box").Type("email").Placeholder("Email address").Value(a.EmailInput).OnInput(a.ValueTo(&a.EmailInput)).Required(true),
+					app.Button().Class("btn-primary").Type("submit").Text("Send Link"),
+					app.P().Class("message").Text(a.Message),
+				),
+			),
+		),
+	)
+}
+
+func (a *MainApp) renderPublicResults() app.UI {
+	var items []app.UI
+	for k, v := range a.Results {
+		items = append(items, app.Li().Text(fmt.Sprintf("%s: %d votes", k, v)))
+	}
+	if len(items) == 0 {
+		items = append(items, app.Li().Text("No votes yet."))
+	}
+	return app.Div().Body(items...)
+}
+
+func (a *MainApp) renderAdmin() app.UI {
+	return app.Div().Class("adwaita-window").Body(
+		app.Div().Class("header-bar").Body(
+			app.H1().Class("title").Text("Admin Dashboard"),
+		),
+		app.Div().Class("content").Body(
+			app.If(a.AdminResults != nil,
+				app.H2().Text("Results"),
+				app.Ul().Class("results-list").Body(
+					a.renderResults(),
+				),
+			).Else(
+				app.Form().OnSubmit(a.onAdminLogin).Body(
+					app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminPwd).OnInput(a.ValueTo(&a.AdminPwd)).Required(true),
+					app.Button().Class("btn-primary").Type("submit").Text("Login"),
+					app.P().Class("message").Text(a.Message),
+				),
+			),
+		),
+	)
+}
+
+func (a *MainApp) renderResults() app.UI {
+	var items []app.UI
+	for k, v := range a.AdminResults {
+		items = append(items, app.Li().Text(fmt.Sprintf("%s: %d votes", k, v)))
+	}
+	return app.Div().Body(items...)
+}
+
+func (a *MainApp) getTitle() string {
+	if a.Config != nil {
+		return a.Config.Title
+	}
+	return "Ph-Vote"
+}
