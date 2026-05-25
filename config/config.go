@@ -1,28 +1,29 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // AppConfig maps the JSON config structure
 type AppConfig struct {
-	Title         string   `json:"title"`
-	AllowedSuffix string   `json:"allowedSuffix"`
-	Options       []string `json:"options"`
-	AdminPassword string   `json:"adminPassword"`
+	Title         string   `toml:"title"`
+	AllowedSuffix string   `toml:"allowedSuffix"`
+	Options       []string `toml:"options"`
+	AdminPassword string   `toml:"adminPassword"`
 	SMTP          struct {
-		Host string `json:"host"`
-		Port int    `json:"port"`
-		User string `json:"user"`
-		Pass string `json:"pass"`
-	} `json:"smtp"`
+		Host string `toml:"host"`
+		Port int    `toml:"port"`
+		User string `toml:"user"`
+		Pass string `toml:"pass"`
+	} `toml:"smtp"`
 }
 
 var Current *AppConfig
 
-// Load reads and parses config.json
+// Load reads and parses config.toml
 func Load(path string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -30,7 +31,7 @@ func Load(path string) error {
 	}
 
 	var c AppConfig
-	if err := json.Unmarshal(b, &c); err != nil {
+	if err := toml.Unmarshal(b, &c); err != nil {
 		return fmt.Errorf("could not parse config file: %w", err)
 	}
 

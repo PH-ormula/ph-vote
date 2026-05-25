@@ -20,7 +20,7 @@ func main() {
 	app.Route("/admin", mainApp)
 	app.RunWhenOnBrowser()
 
-	err := config.Load("config.json")
+	err := config.Load("config.toml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}

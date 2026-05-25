@@ -1,0 +1,14 @@
+title = "Ph-Vote Interactive Voting"
+allowedSuffix = "@shphschool.com"
+options = [
+  "Option A: The Future",
+  "Option B: The Past",
+  "Option C: The Present",
+]
+adminPassword = "admin"
+
+[smtp]
+host = "smtp.example.com"
+port = 587
+user = "vote@example.com"
+pass = "password"
