@@ -34,6 +34,7 @@ func main() {
 	http.HandleFunc(api.PathSignToken, backend.HandleSignToken)
 	http.HandleFunc(api.PathVote, backend.HandleVote)
 	http.HandleFunc(api.PathAdminVotes, backend.HandleAdminVotes)
+	http.HandleFunc(api.PathAdminClearDB, backend.HandleAdminClearDB)
 	http.HandleFunc(api.PathResults, backend.HandleResults)
 	http.HandleFunc(api.PathConfig, backend.HandleConfig)
 

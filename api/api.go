@@ -6,6 +6,7 @@ const (
 	PathSignToken        = "/api/sign-token"
 	PathVote             = "/api/vote"
 	PathAdminVotes       = "/api/admin/votes"
+	PathAdminClearDB     = "/api/admin/clear"
 	PathResults          = "/api/results"
 	PathConfig           = "/api/config" // Exposes safe config to frontend
 )

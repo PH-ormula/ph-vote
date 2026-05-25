@@ -139,3 +139,20 @@ func GetVotes() (map[string]int, error) {
 	}
 	return votes, nil
 }
+
+// ClearDB removes all votes and used tokens
+func ClearDB() error {
+	if _, err := DB.Exec("DELETE FROM used_tokens"); err != nil {
+		return err
+	}
+	if _, err := DB.Exec("DELETE FROM email_logs"); err != nil {
+		return err
+	}
+	if _, err := DB.Exec("DELETE FROM otps"); err != nil {
+		return err
+	}
+	if _, err := DB.Exec("DELETE FROM votes"); err != nil {
+		return err
+	}
+	return nil
+}

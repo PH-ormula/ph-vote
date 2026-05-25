@@ -18,19 +18,21 @@ import (
 
 type MainApp struct {
 	app.Compo
-	Config       *api.ConfigRes
-	EmailInput   string
-	Message      string
-	OTP          string
-	IsVoting     bool
-	VoteOption   string
-	Token        []byte
-	Signature    []byte
-	AdminMode    bool
-	AdminPwd     string
-	AdminResults map[string]int
-	ShowResults  bool
-	Results      map[string]int
+	Config            *api.ConfigRes
+	EmailInput        string
+	Message           string
+	OTP               string
+	IsVoting          bool
+	VoteOption        string
+	Token             []byte
+	Signature         []byte
+	AdminMode         bool
+	AdminPwd          string
+	AdminResults      map[string]int
+	ShowResults       bool
+	Results           map[string]int
+	AdminConfirmClear bool
+	AdminClearPwd     string
 }
 
 func (a *MainApp) OnMount(ctx app.Context) {
@@ -209,6 +211,34 @@ func (a *MainApp) onAdminLogin(ctx app.Context, e app.Event) {
 	})
 }
 
+func (a *MainApp) onAdminClearDBRequest(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	a.AdminConfirmClear = true
+	a.AdminClearPwd = ""
+}
+
+func (a *MainApp) onAdminClearDBCancel(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	a.AdminConfirmClear = false
+}
+
+func (a *MainApp) onAdminClearDBConfirm(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+	ctx.Async(func() {
+		reqData, _ := json.Marshal(api.AdminReq{Password: a.AdminClearPwd})
+		resp, err := http.Post(api.PathAdminClearDB, "application/json", bytes.NewBuffer(reqData))
+		if err == nil && resp.StatusCode == 200 {
+			ctx.Dispatch(func(ctx app.Context) {
+				a.AdminResults = make(map[string]int)
+				a.AdminConfirmClear = false
+				a.Message = "Database cleared successfully."
+			})
+		} else {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Invalid password to clear DB" })
+		}
+	})
+}
+
 func (a *MainApp) Render() app.UI {
 	if a.AdminMode {
 		return a.renderAdmin()
@@ -275,11 +305,27 @@ func (a *MainApp) renderAdmin() app.UI {
 			app.H1().Class("title").Text("Admin Dashboard"),
 		),
 		app.Div().Class("content").Body(
-			app.If(a.AdminResults != nil,
+			app.If(a.AdminConfirmClear,
+				app.H2().Text("Danger Zone"),
+				app.P().Class("dim-text").Text("This will permanently delete all votes and used tokens. Type admin password to confirm."),
+				app.Form().OnSubmit(a.onAdminClearDBConfirm).Body(
+					app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminClearPwd).OnInput(a.ValueTo(&a.AdminClearPwd)).Required(true),
+					app.Div().Class("radio-group").Style("display", "flex").Style("gap", "10px").Body(
+						app.Button().Class("btn-secondary").Text("Cancel").OnClick(a.onAdminClearDBCancel).Type("button"),
+						app.Button().Class("btn-destructive").Type("submit").Text("Permanently Clear Database"),
+					),
+					app.P().Class("message").Text(a.Message),
+				),
+			).ElseIf(a.AdminResults != nil,
 				app.H2().Text("Results"),
 				app.Ul().Class("results-list").Body(
 					a.renderResults(),
 				),
+				app.Div().Style("margin-top", "30px").Body(
+					app.H3().Text("Danger Zone"),
+					app.Button().Class("btn-destructive").Text("Clear Database").OnClick(a.onAdminClearDBRequest),
+				),
+				app.P().Class("message").Text(a.Message),
 			).Else(
 				app.Form().OnSubmit(a.onAdminLogin).Body(
 					app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminPwd).OnInput(a.ValueTo(&a.AdminPwd)).Required(true),

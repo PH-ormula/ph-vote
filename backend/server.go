@@ -152,6 +152,29 @@ func HandleResults(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(api.AdminRes{Votes: votes})
 }
 
+func HandleAdminClearDB(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req api.AdminReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Password != config.Current.AdminPassword {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := ClearDB(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func HandleConfig(w http.ResponseWriter, r *http.Request) {
 	res := api.ConfigRes{
 		Title:     config.Current.Title,
