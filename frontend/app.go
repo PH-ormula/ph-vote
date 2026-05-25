@@ -33,6 +33,7 @@ type MainApp struct {
 	Results           map[string]int
 	AdminConfirmClear bool
 	AdminClearPwd     string
+	AdminClearSentence string
 }
 
 func (a *MainApp) OnMount(ctx app.Context) {
@@ -215,6 +216,7 @@ func (a *MainApp) onAdminClearDBRequest(ctx app.Context, e app.Event) {
 	e.PreventDefault()
 	a.AdminConfirmClear = true
 	a.AdminClearPwd = ""
+	a.AdminClearSentence = ""
 }
 
 func (a *MainApp) onAdminClearDBCancel(ctx app.Context, e app.Event) {
@@ -224,6 +226,11 @@ func (a *MainApp) onAdminClearDBCancel(ctx app.Context, e app.Event) {
 
 func (a *MainApp) onAdminClearDBConfirm(ctx app.Context, e app.Event) {
 	e.PreventDefault()
+	if a.AdminClearSentence != "I understand this deletes all data" {
+		a.Message = "Confirmation sentence does not match exactly."
+		a.Update()
+		return
+	}
 	ctx.Async(func() {
 		reqData, _ := json.Marshal(api.AdminReq{Password: a.AdminClearPwd})
 		resp, err := http.Post(api.PathAdminClearDB, "application/json", bytes.NewBuffer(reqData))
@@ -300,37 +307,50 @@ func (a *MainApp) renderPublicResults() app.UI {
 }
 
 func (a *MainApp) renderAdmin() app.UI {
-	return app.Div().Class("adwaita-window").Body(
-		app.Div().Class("header-bar").Body(
-			app.H1().Class("title").Text("Admin Dashboard"),
-		),
-		app.Div().Class("content").Body(
-			app.If(a.AdminConfirmClear,
-				app.H2().Text("Danger Zone"),
-				app.P().Class("dim-text").Text("This will permanently delete all votes and used tokens. Type admin password to confirm."),
-				app.Form().OnSubmit(a.onAdminClearDBConfirm).Body(
-					app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminClearPwd).OnInput(a.ValueTo(&a.AdminClearPwd)).Required(true),
-					app.Div().Class("radio-group").Style("display", "flex").Style("gap", "10px").Body(
-						app.Button().Class("btn-secondary").Text("Cancel").OnClick(a.onAdminClearDBCancel).Type("button"),
-						app.Button().Class("btn-destructive").Type("submit").Text("Permanently Clear Database"),
+	return app.Div().Body(
+		app.Div().Class("adwaita-window").Body(
+			app.Div().Class("header-bar").Body(
+				app.H1().Class("title").Text("Admin Dashboard"),
+			),
+			app.Div().Class("content").Body(
+				app.If(a.AdminResults != nil,
+					app.H2().Text("Results"),
+					app.Ul().Class("results-list").Body(
+						a.renderResults(),
+					),
+					app.Div().Style("margin-top", "30px").Body(
+						app.H3().Text("Danger Zone"),
+						app.Button().Class("btn-destructive").Text("Clear Database").OnClick(a.onAdminClearDBRequest),
 					),
 					app.P().Class("message").Text(a.Message),
+				).Else(
+					app.Form().OnSubmit(a.onAdminLogin).NoValidate(true).Body(
+						app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminPwd).OnInput(a.ValueTo(&a.AdminPwd)),
+						app.Button().Class("btn-primary").Type("submit").Text("Login").Style("margin-top", "12px"),
+						app.P().Class("message").Text(a.Message),
+					),
 				),
-			).ElseIf(a.AdminResults != nil,
-				app.H2().Text("Results"),
-				app.Ul().Class("results-list").Body(
-					a.renderResults(),
-				),
-				app.Div().Style("margin-top", "30px").Body(
-					app.H3().Text("Danger Zone"),
-					app.Button().Class("btn-destructive").Text("Clear Database").OnClick(a.onAdminClearDBRequest),
-				),
-				app.P().Class("message").Text(a.Message),
-			).Else(
-				app.Form().OnSubmit(a.onAdminLogin).Body(
-					app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminPwd).OnInput(a.ValueTo(&a.AdminPwd)).Required(true),
-					app.Button().Class("btn-primary").Type("submit").Text("Login"),
-					app.P().Class("message").Text(a.Message),
+			),
+		),
+		app.If(a.AdminConfirmClear,
+			app.Div().Class("modal-overlay").Body(
+				app.Div().Class("adwaita-dialog").Body(
+					app.Form().OnSubmit(a.onAdminClearDBConfirm).NoValidate(true).Body(
+						app.Div().Class("dialog-content").Body(
+							app.H2().Class("dialog-title").Text("Clear Database?"),
+							app.P().Class("dialog-body").Text("This will permanently delete all votes and used tokens."),
+							app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminClearPwd).OnInput(a.ValueTo(&a.AdminClearPwd)),
+							app.P().Class("dim-text").Style("font-size", "13px").Text("Type 'I understand this deletes all data' to confirm:"),
+							app.Input().Class("input-box").Type("text").Placeholder("I understand this deletes all data").Value(a.AdminClearSentence).OnInput(a.ValueTo(&a.AdminClearSentence)),
+							app.If(a.Message != "",
+								app.P().Class("error-text").Text(a.Message),
+							),
+						),
+						app.Div().Class("dialog-buttons").Body(
+							app.Button().Type("button").Text("Cancel").OnClick(a.onAdminClearDBCancel),
+							app.Button().Type("submit").Class("destructive-action").Text("Clear"),
+						),
+					),
 				),
 			),
 		),
