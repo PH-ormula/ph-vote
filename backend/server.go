@@ -69,8 +69,12 @@ func HandleSignToken(w http.ResponseWriter, r *http.Request) {
 	signMutex.Lock()
 	defer signMutex.Unlock()
 
-	if !VerifyAndConsumeOTP(req.OTP) {
-		http.Error(w, "Invalid or expired OTP, or email already voted", http.StatusUnauthorized)
+	err := VerifyAndConsumeOTP(req.OTP)
+	if err == ErrAlreadyVoted {
+		http.Error(w, "already_voted", http.StatusConflict) // 409
+		return
+	} else if err != nil {
+		http.Error(w, "Invalid or expired OTP", http.StatusUnauthorized)
 		return
 	}
 

@@ -131,7 +131,29 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 		// 3. Send to server for signing
 		reqData, _ := json.Marshal(api.SignTokenReq{OTP: otp, BlindedToken: blindedToken})
 		resp, err := http.Post(api.PathSignToken, "application/json", bytes.NewBuffer(reqData))
-		if err != nil || resp.StatusCode != 200 {
+		if err != nil {
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Network error" })
+			return
+		}
+		
+		if resp.StatusCode == http.StatusConflict { // 409 Already Voted
+			resResp, err := http.Get(api.PathResults)
+			if err == nil && resResp.StatusCode == 200 {
+				var resData api.AdminRes
+				json.NewDecoder(resResp.Body).Decode(&resData)
+				resResp.Body.Close()
+				ctx.Dispatch(func(ctx app.Context) {
+					a.Results = resData.Votes
+					a.ShowResults = true
+					a.IsVoting = false
+					a.Message = "You have already voted! Here are the current standings."
+					app.Window().Get("history").Call("replaceState", nil, "", "/") // Hide OTP from URL
+				})
+			}
+			return
+		}
+
+		if resp.StatusCode != 200 {
 			ctx.Dispatch(func(ctx app.Context) { a.Message = "Magic link invalid or expired" })
 			return
 		}

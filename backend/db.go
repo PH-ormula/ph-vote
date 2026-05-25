@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -64,32 +65,31 @@ func SetOTP(otp, email string) error {
 	return err
 }
 
-// VerifyAndConsumeOTP checks if OTP exists and is valid, returns true if valid and deletes it
-func VerifyAndConsumeOTP(otp string) bool {
-	var expiresAt time.Time
+var ErrOTPNotFound = errors.New("OTP not found")
+var ErrOTPExpired = errors.New("OTP expired")
+var ErrAlreadyVoted = errors.New("email already voted")
+
+// VerifyAndConsumeOTP checks if OTP exists and is valid. Returns error if invalid or already voted.
+func VerifyAndConsumeOTP(otp string) error {
 	var emailHash string
-	err := DB.QueryRow("SELECT expires_at, email_hash FROM otps WHERE otp = ?", otp).Scan(&expiresAt, &emailHash)
+	err := DB.QueryRow("SELECT email_hash FROM otps WHERE otp = ?", otp).Scan(&emailHash)
 	if err != nil {
-		return false
-	}
-
-	_, _ = DB.Exec("DELETE FROM otps WHERE otp = ?", otp)
-
-	if time.Now().After(expiresAt) {
-		return false
+		return ErrOTPNotFound
 	}
 
 	// Also ensure email hasn't already voted (received signature)
 	var count int
 	_ = DB.QueryRow("SELECT COUNT(*) FROM email_logs WHERE email_hash = ?", emailHash).Scan(&count)
 	if count > 0 {
-		return false
+		return ErrAlreadyVoted
 	}
 
 	// Mark email as having received signature
 	_, _ = DB.Exec("INSERT INTO email_logs (email_hash) VALUES (?)", emailHash)
+	// We don't delete the OTP here so that if they click the link again within 10 minutes,
+	// it can still map to their email and correctly identify they've already voted.
 
-	return true
+	return nil
 }
 
 func RecordVote(token []byte, option string) error {
