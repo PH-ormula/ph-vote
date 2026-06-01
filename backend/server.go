@@ -36,6 +36,14 @@ func HandleRequestMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, adminEmail := range config.Current.AdminEmails {
+		if req.Email == adminEmail {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]bool{"isAdmin": true})
+			return
+		}
+	}
+
 	if !strings.HasSuffix(req.Email, config.Current.AllowedSuffix) {
 		http.Error(w, "Email suffix not allowed", http.StatusForbidden)
 		return

@@ -12,6 +12,7 @@ type AppConfig struct {
 	Title         string   `toml:"title"`
 	AllowedSuffix string   `toml:"allowedSuffix"`
 	Options       []string `toml:"options"`
+	AdminEmails   []string `toml:"adminEmails"`
 	AdminPassword string   `toml:"adminPassword"`
 	SMTP          struct {
 		Host string `toml:"host"`

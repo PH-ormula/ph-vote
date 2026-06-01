@@ -10,6 +10,7 @@ func TestLoadTOML(t *testing.T) {
 title = "Test Voting"
 allowedSuffix = "@test.com"
 options = ["A", "B"]
+adminEmails = ["admin1@test.com", "admin2@test.com"]
 adminPassword = "pass"
 
 [smtp]
@@ -44,5 +45,8 @@ pass = "testpass"
 	}
 	if len(Current.Options) != 2 || Current.Options[0] != "A" {
 		t.Errorf("Expected options [A, B], got %v", Current.Options)
+	}
+	if len(Current.AdminEmails) != 2 || Current.AdminEmails[1] != "admin2@test.com" {
+		t.Errorf("Expected adminEmails [admin1@test.com, admin2@test.com], got %v", Current.AdminEmails)
 	}
 }

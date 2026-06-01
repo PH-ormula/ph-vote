@@ -39,12 +39,6 @@ type MainApp struct {
 
 func (a *MainApp) OnMount(ctx app.Context) {
 	u, _ := url.Parse(app.Window().URL().String())
-	if u.Path == "/admin" {
-		a.AdminMode = true
-		a.Update()
-		return
-	}
-
 	ctx.Async(func() {
 		resp, err := http.Get(api.PathConfig)
 		if err == nil {
@@ -79,7 +73,23 @@ func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
 		resp, err := http.Post(api.PathRequestMagicLink, "application/json", bytes.NewBuffer(reqData))
 		
 		ctx.Dispatch(func(ctx app.Context) {
-			if err != nil || resp.StatusCode != 200 {
+			if err != nil {
+				a.Message = "Network error."
+				return
+			}
+
+			if resp.Header.Get("Content-Type") == "application/json" {
+				var resData map[string]bool
+				json.NewDecoder(resp.Body).Decode(&resData)
+				if resData["isAdmin"] {
+					a.AdminMode = true
+					a.EmailInput = ""
+					a.Message = ""
+					return
+				}
+			}
+
+			if resp.StatusCode != 200 {
 				a.Message = "Failed to request link. Invalid suffix or already requested."
 			} else {
 				a.Message = "Magic link sent! Check your inbox (or terminal logs)."

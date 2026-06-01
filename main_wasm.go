@@ -11,6 +11,5 @@ import (
 func main() {
 	mainApp := &frontend.MainApp{}
 	app.Route("/", mainApp)
-	app.Route("/admin", mainApp)
 	app.RunWhenOnBrowser()
 }

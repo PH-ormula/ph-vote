@@ -1,6 +1,7 @@
 title = "Ph-Vote Interactive Voting"
 allowedSuffix = "@shphschool.com"
 options = ["Candidate 1", "Candidate 2", "Candidate 3"]
+adminEmails = ["admin@shphschool.com", "admin2@shphschool.com"]
 adminPassword = "admin"
 
 [smtp]

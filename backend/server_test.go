@@ -97,4 +97,32 @@ func TestServerFeatures(t *testing.T) {
 			t.Errorf("Expected 409 Conflict, got %d", w.Code)
 		}
 	})
+
+	t.Run("HandleRequestMagicLink_Admin", func(t *testing.T) {
+		config.Current.AdminEmails = []string{"admin1@test.com", "admin2@test.com"}
+		
+		// Test standard email (should not return isAdmin)
+		reqBody, _ := json.Marshal(api.MagicLinkReq{Email: "user@test.com"})
+		req := httptest.NewRequest(http.MethodPost, "/api/request-magic-link", bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		HandleRequestMagicLink(w, req)
+		
+		var res map[string]bool
+		json.NewDecoder(w.Body).Decode(&res)
+		if res["isAdmin"] {
+			t.Errorf("Expected isAdmin false for normal user")
+		}
+
+		// Test admin email
+		reqBody, _ = json.Marshal(api.MagicLinkReq{Email: "admin2@test.com"})
+		req = httptest.NewRequest(http.MethodPost, "/api/request-magic-link", bytes.NewBuffer(reqBody))
+		w = httptest.NewRecorder()
+		HandleRequestMagicLink(w, req)
+
+		var resAdmin map[string]bool
+		json.NewDecoder(w.Body).Decode(&resAdmin)
+		if !resAdmin["isAdmin"] {
+			t.Errorf("Expected isAdmin true for admin email")
+		}
+	})
 }
