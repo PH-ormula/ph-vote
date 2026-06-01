@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 
 	"github.com/linckode/circl/blindsign/blindrsa"
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
@@ -317,15 +318,69 @@ func (a *MainApp) Render() app.UI {
 	)
 }
 
-func (a *MainApp) renderPublicResults() app.UI {
+func (a *MainApp) renderBarChart(results map[string]int) app.UI {
+	// First, collect all options and their vote counts
+	type CandidateVote struct {
+		Name  string
+		Votes int
+	}
+
+	var votes []CandidateVote
+
+	// Ensure we include all candidates from config, even those with 0 votes
+	if a.Config != nil {
+		for _, opt := range a.Config.Options {
+			count := 0
+			if val, ok := results[opt]; ok {
+				count = val
+			}
+			votes = append(votes, CandidateVote{Name: opt, Votes: count})
+		}
+	} else {
+		// Fallback if config is not loaded but results exist
+		for k, v := range results {
+			votes = append(votes, CandidateVote{Name: k, Votes: v})
+		}
+	}
+
+	// Sort by votes descending
+	sort.SliceStable(votes, func(i, j int) bool {
+		return votes[i].Votes > votes[j].Votes
+	})
+
+	// Find max votes for scaling the bar chart
+	maxVotes := 0
+	for _, v := range votes {
+		if v.Votes > maxVotes {
+			maxVotes = v.Votes
+		}
+	}
+
 	var items []app.UI
-	for k, v := range a.Results {
-		items = append(items, app.Li().Text(fmt.Sprintf("%s: %d votes", k, v)))
+	for _, v := range votes {
+		percentage := 0.0
+		if maxVotes > 0 {
+			percentage = (float64(v.Votes) / float64(maxVotes)) * 100.0
+		}
+		
+		items = append(items, app.Li().Class("result-item").Body(
+			app.Div().Class("result-header").Body(
+				app.Span().Class("result-name").Text(v.Name),
+				app.Span().Class("result-votes").Text(fmt.Sprintf("%d votes", v.Votes)),
+			),
+			app.Div().Class("result-bar-container").Body(
+				app.Div().Class("result-bar").Style("width", fmt.Sprintf("%.1f%%", percentage)),
+			),
+		))
 	}
 	if len(items) == 0 {
 		items = append(items, app.Li().Text("No votes yet."))
 	}
 	return app.Div().Body(items...)
+}
+
+func (a *MainApp) renderPublicResults() app.UI {
+	return a.renderBarChart(a.Results)
 }
 
 func (a *MainApp) renderAdmin() app.UI {
@@ -380,11 +435,7 @@ func (a *MainApp) renderAdmin() app.UI {
 }
 
 func (a *MainApp) renderResults() app.UI {
-	var items []app.UI
-	for k, v := range a.AdminResults {
-		items = append(items, app.Li().Text(fmt.Sprintf("%s: %d votes", k, v)))
-	}
-	return app.Div().Body(items...)
+	return a.renderBarChart(a.AdminResults)
 }
 
 func (a *MainApp) getTitle() string {

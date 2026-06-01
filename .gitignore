@@ -6,6 +6,7 @@
 *.dylib
 *.test
 *.out
+*wasm
 /ph-vote
 
 # Build directory

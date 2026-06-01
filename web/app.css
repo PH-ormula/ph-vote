@@ -192,11 +192,45 @@ body {
     gap: 8px;
 }
 
-.results-list li {
+.results-list li.result-item {
     padding: 12px;
     background: var(--header-bg);
     border-radius: var(--btn-radius);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-weight: bold;
+    font-size: 14px;
+}
+
+.result-name {
+    color: var(--text-color);
+}
+
+.result-votes {
+    color: var(--dim-text);
+    font-size: 13px;
+}
+
+.result-bar-container {
+    height: 8px;
+    width: 100%;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.result-bar {
+    height: 100%;
+    background-color: var(--btn-primary-bg);
+    border-radius: 4px;
+    transition: width 0.5s ease-out;
 }
 
 /* Adwaita Modal Dialog */
