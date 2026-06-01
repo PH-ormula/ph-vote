@@ -51,8 +51,8 @@ An interactive, anonymous voting web application built with Go. It features a We
    ```
    Or build it as an executable:
    ```bash
-   go build -o ph-vote main_server.go
-   ./ph-vote
+   go build -o build/server main_server.go
+   ./build/server
    ```
 
 3. Open your browser and navigate to `http://localhost:8080`.

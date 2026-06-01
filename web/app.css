@@ -12,7 +12,22 @@
     font-style: normal;
 }
 
+@font-face {
+    font-family: 'Open Dyslexic Propo';
+    src: url('/assets/fonts/opendyslexic-propo/OpenDyslexicNerdFontPropo-Regular.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Open Dyslexic Propo';
+    src: url('/assets/fonts/opendyslexic-propo/OpenDyslexicNerdFontPropo-Bold.otf') format('opentype');
+    font-weight: bold;
+    font-style: normal;
+}
+
 :root {
+    --current-font: 'Futura';
     --window-bg: #FAFAFA;
     --header-bg: #EBEBEB;
     --text-color: #242424;
@@ -45,7 +60,6 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Futura', system-ui, sans-serif;
     background-color: var(--window-bg);
     color: var(--text-color);
     display: flex;
@@ -53,6 +67,10 @@ body {
     align-items: center;
     height: 100vh;
     overflow: hidden;
+}
+
+* {
+    font-family: var(--current-font), system-ui, sans-serif !important;
 }
 
 .adwaita-window {
@@ -102,7 +120,7 @@ body {
     border: 1px solid var(--border-color);
     background: transparent;
     color: var(--text-color);
-    font-family: 'Futura', system-ui, sans-serif;
+    font-family: var(--current-font), system-ui, sans-serif !important;
     font-size: 15px;
     box-sizing: border-box;
 }
@@ -118,7 +136,7 @@ body {
     padding: 10px 12px;
     border-radius: var(--btn-radius);
     border: none;
-    font-family: 'Futura', system-ui, sans-serif;
+    font-family: var(--current-font), system-ui, sans-serif !important;
     font-size: 15px;
     font-weight: bold;
     cursor: pointer;
@@ -286,7 +304,7 @@ body {
     padding: 14px;
     background: transparent;
     border: none;
-    font-family: 'Futura', system-ui, sans-serif;
+    font-family: var(--current-font), system-ui, sans-serif !important;
     font-size: 15px;
     font-weight: bold;
     cursor: pointer;
@@ -312,4 +330,51 @@ body {
     margin-top: 12px;
     font-weight: bold;
     color: #e01b24;
+}
+
+/* Font Toggle Button */
+.font-toggle-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    background: var(--header-bg);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--current-font), sans-serif !important;
+    font-size: 14px;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+.font-toggle-btn:hover {
+    background-color: var(--btn-secondary-hover);
+}
+
+.font-toggle-btn .tooltip {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background-color: var(--text-color);
+    color: var(--window-bg);
+    font-size: 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease;
+    font-family: var(--current-font), sans-serif !important;
+}
+
+.font-toggle-btn:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
 }

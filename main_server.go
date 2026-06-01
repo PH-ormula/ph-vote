@@ -51,6 +51,9 @@ func main() {
 		Styles: []string{
 			"/web/app.css",
 		},
+		Scripts: []string{
+			"/web/font-toggle.js",
+		},
 	})
 
 	log.Println("Server started on http://localhost:8080")
