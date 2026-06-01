@@ -19,21 +19,21 @@ import (
 
 type MainApp struct {
 	app.Compo
-	Config            *api.ConfigRes
-	EmailInput        string
-	Message           string
-	OTP               string
-	IsVoting          bool
-	VoteOption        string
-	Token             []byte
-	Signature         []byte
-	AdminMode         bool
-	AdminPwd          string
-	AdminResults      map[string]int
-	ShowResults       bool
-	Results           map[string]int
-	AdminConfirmClear bool
-	AdminClearPwd     string
+	Config             *api.ConfigRes
+	EmailInput         string
+	Message            string
+	OTP                string
+	IsVoting           bool
+	VoteOption         string
+	Token              []byte
+	Signature          []byte
+	AdminMode          bool
+	AdminPwd           string
+	AdminResults       map[string]int
+	ShowResults        bool
+	Results            map[string]int
+	AdminConfirmClear  bool
+	AdminClearPwd      string
 	AdminClearSentence string
 }
 
@@ -47,7 +47,7 @@ func (a *MainApp) OnMount(ctx app.Context) {
 				ctx.Dispatch(func(ctx app.Context) {
 					a.Config = &conf
 					app.Window().Get("document").Set("title", conf.Title)
-					
+
 					// Check magic link
 					otp := u.Query().Get("otp")
 					if otp != "" {
@@ -71,7 +71,7 @@ func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
 	ctx.Async(func() {
 		reqData, _ := json.Marshal(api.MagicLinkReq{Email: email})
 		resp, err := http.Post(api.PathRequestMagicLink, "application/json", bytes.NewBuffer(reqData))
-		
+
 		ctx.Dispatch(func(ctx app.Context) {
 			if err != nil {
 				a.Message = "Network error."
@@ -92,7 +92,7 @@ func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
 			if resp.StatusCode != 200 {
 				a.Message = "Failed to request link. Invalid suffix or already requested."
 			} else {
-				a.Message = "Magic link sent! Check your inbox (or terminal logs)."
+				a.Message = "Magic link sent! Check your inbox."
 			}
 		})
 	})
@@ -115,7 +115,7 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 			ctx.Dispatch(func(ctx app.Context) { a.Message = "Invalid public key format" })
 			return
 		}
-		
+
 		pubKey, ok := pubKeyAny.(*rsa.PublicKey)
 		if !ok {
 			ctx.Dispatch(func(ctx app.Context) { a.Message = "Public key is not RSA" })
@@ -128,12 +128,12 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 			ctx.Dispatch(func(ctx app.Context) { a.Message = "Crypto init failed" })
 			return
 		}
-		
+
 		prepared, err := client.Prepare(rand.Reader, rawToken)
 		if err != nil {
 			return
 		}
-		
+
 		blindedToken, state, err := client.Blind(rand.Reader, prepared)
 		if err != nil {
 			return
@@ -146,7 +146,7 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 			ctx.Dispatch(func(ctx app.Context) { a.Message = "Network error" })
 			return
 		}
-		
+
 		if resp.StatusCode == http.StatusConflict { // 409 Already Voted
 			resResp, err := http.Get(api.PathResults)
 			if err == nil && resResp.StatusCode == 200 {
@@ -196,7 +196,7 @@ func (a *MainApp) onVote(ctx app.Context, e app.Event) {
 	if a.VoteOption == "" {
 		return
 	}
-	
+
 	a.Message = "Submitting vote anonymously..."
 	ctx.Async(func() {
 		reqData, _ := json.Marshal(api.VoteReq{
@@ -372,7 +372,7 @@ func (a *MainApp) renderBarChart(results map[string]int) app.UI {
 		if maxVotes > 0 {
 			percentage = (float64(v.Votes) / float64(maxVotes)) * 100.0
 		}
-		
+
 		items = append(items, app.Li().Class("result-item").Body(
 			app.Div().Class("result-header").Body(
 				app.Span().Class("result-name").Text(v.Name),
