@@ -1,2 +1,21 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/ph-vote
+
+# Build directory
 /build/
+
+# Database
 vote.db
+
+# Configuration
+config.toml
+
+# OS
+.DS_Store

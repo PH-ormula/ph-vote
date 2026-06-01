@@ -1,10 +1,6 @@
 title = "Ph-Vote Interactive Voting"
 allowedSuffix = "@shphschool.com"
-options = [
-  "Option A: The Future",
-  "Option B: The Past",
-  "Option C: The Present",
-]
+options = ["Candidate 1", "Candidate 2", "Candidate 3"]
 adminPassword = "admin"
 
 [smtp]
