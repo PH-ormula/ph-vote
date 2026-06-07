@@ -8,6 +8,7 @@ import (
 func TestLoadTOML(t *testing.T) {
 	tomlContent := `
 title = "Test Voting"
+baseURL = "http://test.com"
 allowedSuffix = "@test.com"
 options = ["A", "B"]
 adminEmails = ["admin1@test.com", "admin2@test.com"]
@@ -39,6 +40,9 @@ pass = "testpass"
 	}
 	if Current.Title != "Test Voting" {
 		t.Errorf("Expected title 'Test Voting', got '%s'", Current.Title)
+	}
+	if Current.BaseURL != "http://test.com" {
+		t.Errorf("Expected BaseURL 'http://test.com', got '%s'", Current.BaseURL)
 	}
 	if Current.SMTP.Host != "smtp.test.com" {
 		t.Errorf("Expected SMTP host 'smtp.test.com', got '%s'", Current.SMTP.Host)

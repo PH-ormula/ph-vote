@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"net/smtp"
 	"strings"
 	"sync"
 
@@ -24,9 +25,23 @@ func GenerateOTP() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
-// SendMockEmail simulates sending an email
-func SendMockEmail(to, otp string) {
-	log.Printf("\n--- MOCK EMAIL ---\nTo: %s\nSubject: Your Ph-Vote Magic Link\nBody: Click here to vote securely: http://localhost:8080/?otp=%s\n------------------\n", to, otp)
+// SendEmail sends a real email using SMTP configuration
+func SendEmail(to, otp string) error {
+	smtpConfig := config.Current.SMTP
+	auth := smtp.PlainAuth("", smtpConfig.User, smtpConfig.Pass, smtpConfig.Host)
+	
+	from := smtpConfig.User
+	subject := "Your Ph-Vote Magic Link"
+	body := fmt.Sprintf("Click here to vote securely: %s/?otp=%s\n", config.Current.BaseURL, otp)
+	
+	msg := []byte("From: " + from + "\r\n" +
+		"To: " + to + "\r\n" +
+		"Subject: " + subject + "\r\n\r\n" +
+		body)
+		
+	addr := fmt.Sprintf("%s:%d", smtpConfig.Host, smtpConfig.Port)
+	log.Printf("Sending email to %s via %s", to, addr)
+	return smtp.SendMail(addr, auth, from, []string{to}, msg)
 }
 
 func HandleRequestMagicLink(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +75,11 @@ func HandleRequestMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// In a real app, send actual email using config.Current.SMTP
-	SendMockEmail(req.Email, otp)
+	if err := SendEmail(req.Email, otp); err != nil {
+		log.Printf("Failed to send email to %s: %v", req.Email, err)
+		http.Error(w, "Failed to send email", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

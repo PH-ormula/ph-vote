@@ -10,6 +10,7 @@ import (
 // AppConfig maps the JSON config structure
 type AppConfig struct {
 	Title         string   `toml:"title"`
+	BaseURL       string   `toml:"baseURL"`
 	AllowedSuffix string   `toml:"allowedSuffix"`
 	Options       []string `toml:"options"`
 	AdminEmails   []string `toml:"adminEmails"`

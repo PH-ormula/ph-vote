@@ -1,11 +1,12 @@
 title = "Ph-Vote Interactive Voting"
+baseURL = "http://localhost:8080"
 allowedSuffix = "@shphschool.com"
 options = ["Candidate 1", "Candidate 2", "Candidate 3"]
-adminEmails = ["admin@shphschool.com", "admin2@shphschool.com"]
+adminEmails = ["zhangsiyuan@shphschool.com", "pengzihan@shphschool.com"]
 adminPassword = "admin"
 
 [smtp]
-host = "smtp.example.com"
+host = "smtp-relay.brevo.com"
 port = 587
-user = "vote@example.com"
-pass = "password"
+user = "your_brevo_email@example.com"
+pass = "your_brevo_smtp_key"
