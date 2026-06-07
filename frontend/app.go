@@ -21,6 +21,7 @@ type MainApp struct {
 	app.Compo
 	Config             *api.ConfigRes
 	EmailInput         string
+	ShowEmailError     bool
 	Message            string
 	OTP                string
 	IsVoting           bool
@@ -38,6 +39,13 @@ type MainApp struct {
 }
 
 func (a *MainApp) OnMount(ctx app.Context) {
+	app.Window().AddEventListener("click", func(ctx app.Context, e app.Event) {
+		if a.ShowEmailError {
+			a.ShowEmailError = false
+			a.Update()
+		}
+	})
+
 	u, _ := url.Parse(app.Window().URL().String())
 	ctx.Async(func() {
 		resp, err := http.Get(api.PathConfig)
@@ -65,6 +73,12 @@ func (a *MainApp) OnMount(ctx app.Context) {
 
 func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
 	e.PreventDefault()
+	if a.EmailInput == "" {
+		a.ShowEmailError = true
+		a.Update()
+		return
+	}
+	a.ShowEmailError = false
 	a.Message = "Requesting magic link..."
 	email := a.EmailInput
 
@@ -299,10 +313,10 @@ func (a *MainApp) Render() app.UI {
 				app.Ul().Class("results-list").Body(
 					a.renderPublicResults(),
 				),
-				app.P().Class("message").Text(a.Message),
+				app.P().Class(a.msgClass("message")).Text(a.Message),
 			).ElseIf(a.IsVoting,
 				app.Form().OnSubmit(a.onVote).Body(
-					app.P().Class("dim-text").Text(a.Message),
+					app.P().Class(a.msgClass("dim-text")).Text(a.Message),
 					app.Div().Class("radio-group").Body(
 						app.Range(options).Slice(func(i int) app.UI {
 							opt := options[i]
@@ -317,11 +331,30 @@ func (a *MainApp) Render() app.UI {
 					app.Button().Class("btn-primary").Type("submit").Text("Submit Vote"),
 				),
 			).Else(
-				app.Form().OnSubmit(a.onRequestLink).Body(
+				app.Form().OnSubmit(a.onRequestLink).NoValidate(true).Body(
 					app.P().Class("dim-text").Text("Enter your email to receive an anonymous voting link."),
-					app.Input().Class("input-box").Type("email").Placeholder("Email address").Value(a.EmailInput).OnInput(a.ValueTo(&a.EmailInput)).Required(true),
-					app.Button().Class("btn-primary").Type("submit").Text("Send Link"),
-					app.P().Class("message").Text(a.Message),
+					app.Div().Class("input-container").Body(
+						app.Input().
+							Class(a.inputClass()).
+							Type("email").
+							Placeholder("Email address").
+							Value(a.EmailInput).
+							OnInput(func(ctx app.Context, e app.Event) {
+								a.EmailInput = ctx.JSSrc().Get("value").String()
+								if a.ShowEmailError {
+									a.ShowEmailError = false
+								}
+								a.Update()
+							}),
+						app.If(a.ShowEmailError,
+							app.Div().Class("adwaita-popover").Body(
+								app.Span().Class("popover-icon-error").Text("!"),
+								app.Span().Text("Please fill out this field."),
+							),
+						),
+					),
+					app.Button().Class("btn-primary").Type("submit").Text("Send Link").Style("margin-top", "12px"),
+					app.P().Class(a.msgClass("message")).Text(a.Message),
 				),
 			),
 		),
@@ -409,12 +442,12 @@ func (a *MainApp) renderAdmin() app.UI {
 						app.H3().Text("Danger Zone"),
 						app.Button().Class("btn-destructive").Text("Clear Database").OnClick(a.onAdminClearDBRequest),
 					),
-					app.P().Class("message").Text(a.Message),
+					app.P().Class(a.msgClass("message")).Text(a.Message),
 				).Else(
 					app.Form().OnSubmit(a.onAdminLogin).NoValidate(true).Body(
 						app.Input().Class("input-box").Type("password").Placeholder("Admin Password").Value(a.AdminPwd).OnInput(a.ValueTo(&a.AdminPwd)),
 						app.Button().Class("btn-primary").Type("submit").Text("Login").Style("margin-top", "12px"),
-						app.P().Class("message").Text(a.Message),
+						app.P().Class(a.msgClass("message")).Text(a.Message),
 					),
 				),
 			),
@@ -446,6 +479,41 @@ func (a *MainApp) renderAdmin() app.UI {
 
 func (a *MainApp) renderResults() app.UI {
 	return a.renderBarChart(a.AdminResults)
+}
+
+func isErrorMsg(msg string) bool {
+	switch msg {
+	case "Failed to request link. Invalid suffix or already requested.",
+		"Network error.",
+		"Failed to parse server key",
+		"Invalid public key format",
+		"Public key is not RSA",
+		"Crypto init failed",
+		"Network error",
+		"You have already voted! Here are the current standings.",
+		"Magic link invalid or expired",
+		"Failed to unblind signature",
+		"Vote failed. You may have already voted.",
+		"Invalid password",
+		"Confirmation sentence does not match exactly.",
+		"Invalid password to clear DB":
+		return true
+	}
+	return false
+}
+
+func (a *MainApp) msgClass(defaultClass string) string {
+	if isErrorMsg(a.Message) {
+		return "error-text"
+	}
+	return defaultClass
+}
+
+func (a *MainApp) inputClass() string {
+	if a.ShowEmailError {
+		return "input-box error"
+	}
+	return "input-box"
 }
 
 func (a *MainApp) getTitle() string {
