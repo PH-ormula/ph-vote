@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -28,8 +27,7 @@ func InitDB() {
 	);
 	CREATE TABLE IF NOT EXISTS otps (
 		otp TEXT PRIMARY KEY,
-		email_hash TEXT,
-		expires_at DATETIME
+		email_hash TEXT
 	);
 	CREATE TABLE IF NOT EXISTS used_tokens (
 		token_hash TEXT PRIMARY KEY,
@@ -57,16 +55,14 @@ func HashToken(token []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// SetOTP stores an OTP for a hashed email, valid for 10 minutes
+// SetOTP stores an OTP for a hashed email
 func SetOTP(otp, email string) error {
 	hash := HashEmail(email)
-	expiresAt := time.Now().Add(10 * time.Minute)
-	_, err := DB.Exec("INSERT INTO otps (otp, email_hash, expires_at) VALUES (?, ?, ?)", otp, hash, expiresAt)
+	_, err := DB.Exec("INSERT INTO otps (otp, email_hash) VALUES (?, ?)", otp, hash)
 	return err
 }
 
 var ErrOTPNotFound = errors.New("OTP not found")
-var ErrOTPExpired = errors.New("OTP expired")
 var ErrAlreadyVoted = errors.New("email already voted")
 
 // VerifyAndConsumeOTP checks if OTP exists and is valid. Returns error if invalid or already voted.
@@ -86,7 +82,7 @@ func VerifyAndConsumeOTP(otp string) error {
 
 	// Mark email as having received signature
 	_, _ = DB.Exec("INSERT INTO email_logs (email_hash) VALUES (?)", emailHash)
-	// We don't delete the OTP here so that if they click the link again within 10 minutes,
+	// We don't delete the OTP here so that if they click the link again,
 	// it can still map to their email and correctly identify they've already voted.
 
 	return nil

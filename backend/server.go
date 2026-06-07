@@ -75,10 +75,15 @@ func HandleRequestMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := SendEmail(req.Email, otp); err != nil {
-		log.Printf("Failed to send email to %s: %v", req.Email, err)
-		http.Error(w, "Failed to send email", http.StatusInternalServerError)
-		return
+	link := fmt.Sprintf("%s/?otp=%s", config.Current.BaseURL, otp)
+	log.Printf("\n--- MAGIC LINK ---\nTo: %s\nLink: %s\n------------------\n", req.Email, link)
+
+	if !config.Current.SkipEmail {
+		if err := SendEmail(req.Email, otp); err != nil {
+			log.Printf("Failed to send email to %s: %v", req.Email, err)
+			http.Error(w, "Failed to send email", http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -100,7 +105,7 @@ func HandleSignToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "already_voted", http.StatusConflict) // 409
 		return
 	} else if err != nil {
-		http.Error(w, "Invalid or expired OTP", http.StatusUnauthorized)
+		http.Error(w, "Invalid OTP", http.StatusUnauthorized)
 		return
 	}
 

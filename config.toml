@@ -4,6 +4,7 @@ allowedSuffix = "@shphschool.com"
 options = ["Candidate 1", "Candidate 2", "Candidate 3"]
 adminEmails = ["zhangsiyuan@shphschool.com", "pengzihan@shphschool.com"]
 adminPassword = "admin"
+skipEmail = true
 
 [smtp]
 host = "smtp-relay.brevo.com"

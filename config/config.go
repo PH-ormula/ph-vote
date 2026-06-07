@@ -15,6 +15,7 @@ type AppConfig struct {
 	Options       []string `toml:"options"`
 	AdminEmails   []string `toml:"adminEmails"`
 	AdminPassword string   `toml:"adminPassword"`
+	SkipEmail     bool     `toml:"skipEmail"`
 	SMTP          struct {
 		Host string `toml:"host"`
 		Port int    `toml:"port"`

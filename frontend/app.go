@@ -179,7 +179,7 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 		}
 
 		if resp.StatusCode != 200 {
-			ctx.Dispatch(func(ctx app.Context) { a.Message = "Magic link invalid or expired" })
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Magic link invalid" })
 			return
 		}
 
@@ -491,7 +491,7 @@ func isErrorMsg(msg string) bool {
 		"Crypto init failed",
 		"Network error",
 		"You have already voted! Here are the current standings.",
-		"Magic link invalid or expired",
+		"Magic link invalid",
 		"Failed to unblind signature",
 		"Vote failed. You may have already voted.",
 		"Invalid password",

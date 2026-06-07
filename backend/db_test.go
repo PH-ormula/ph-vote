@@ -17,7 +17,7 @@ func TestDBFeatures(t *testing.T) {
 
 	createTables := `
 	CREATE TABLE IF NOT EXISTS email_logs (email_hash TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-	CREATE TABLE IF NOT EXISTS otps (otp TEXT PRIMARY KEY, email_hash TEXT, expires_at DATETIME);
+	CREATE TABLE IF NOT EXISTS otps (otp TEXT PRIMARY KEY, email_hash TEXT);
 	CREATE TABLE IF NOT EXISTS used_tokens (token_hash TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 	CREATE TABLE IF NOT EXISTS votes (id INTEGER PRIMARY KEY AUTOINCREMENT, option TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 	`
@@ -29,7 +29,7 @@ func TestDBFeatures(t *testing.T) {
 	t.Run("ClearDB", func(t *testing.T) {
 		DB.Exec("INSERT INTO votes (option) VALUES ('A')")
 		DB.Exec("INSERT INTO email_logs (email_hash) VALUES ('hash1')")
-		DB.Exec("INSERT INTO otps (otp, email_hash, expires_at) VALUES ('123', 'hash1', '2030-01-01')")
+		DB.Exec("INSERT INTO otps (otp, email_hash) VALUES ('123', 'hash1')")
 		DB.Exec("INSERT INTO used_tokens (token_hash) VALUES ('tok1')")
 
 		if err := ClearDB(); err != nil {
