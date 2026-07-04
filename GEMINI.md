@@ -1,0 +1,1 @@
+- Build all binaries in this project in the ./build/ folder, both wasm and server binaries
