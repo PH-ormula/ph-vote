@@ -2,9 +2,12 @@ package frontend
 
 import (
 	"bytes"
-	"crypto/rand"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -38,6 +41,26 @@ type MainApp struct {
 	AdminClearSentence string
 }
 
+type deterministicReader struct {
+	stream cipher.Stream
+}
+
+func newDeterministicReader(seed string) *deterministicReader {
+	key := sha256.Sum256([]byte(seed))
+	block, _ := aes.NewCipher(key[:])
+	var iv [16]byte // 0 initialization vector
+	stream := cipher.NewCTR(block, iv[:])
+	return &deterministicReader{stream: stream}
+}
+
+func (r *deterministicReader) Read(p []byte) (n int, err error) {
+	for i := range p {
+		p[i] = 0
+	}
+	r.stream.XORKeyStream(p, p)
+	return len(p), nil
+}
+
 func (a *MainApp) OnMount(ctx app.Context) {
 	app.Window().AddEventListener("click", func(ctx app.Context, e app.Event) {
 		if a.ShowEmailError {
@@ -63,6 +86,30 @@ func (a *MainApp) OnMount(ctx app.Context) {
 						a.OTP = otp
 						a.Update()
 						ctx.Async(a.performBlindSignAndShowVote(ctx, otp, conf.PublicKey))
+					} else {
+						restored := false
+						ls := app.Window().Get("localStorage")
+						if ls.Truthy() {
+							tokStr := ls.Call("getItem", "vote_token").String()
+							sigStr := ls.Call("getItem", "vote_sig").String()
+							if tokStr != "" && sigStr != "" && tokStr != "null" && sigStr != "null" {
+								tok, err1 := base64.StdEncoding.DecodeString(tokStr)
+								sig, err2 := base64.StdEncoding.DecodeString(sigStr)
+								if err1 == nil && err2 == nil {
+									a.Token = tok
+									a.Signature = sig
+									a.IsVoting = true
+									a.Message = "Session restored. Your vote is untraceable."
+									a.Update()
+									restored = true
+								}
+							}
+						}
+						if !restored {
+							// No session and no OTP, simply show email form (default state)
+							a.Message = ""
+							a.Update()
+						}
 					}
 				})
 			}
@@ -114,9 +161,11 @@ func (a *MainApp) onRequestLink(ctx app.Context, e app.Event) {
 
 func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKeyPEM []byte) func() {
 	return func() {
+		dr := newDeterministicReader(otp)
+
 		// 1. Prepare raw token (the actual vote token)
 		rawToken := make([]byte, 32)
-		rand.Read(rawToken)
+		dr.Read(rawToken)
 
 		// Parse Public Key
 		block, _ := pem.Decode(pubKeyPEM)
@@ -143,12 +192,12 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 			return
 		}
 
-		prepared, err := client.Prepare(rand.Reader, rawToken)
+		prepared, err := client.Prepare(dr, rawToken)
 		if err != nil {
 			return
 		}
 
-		blindedToken, state, err := client.Blind(rand.Reader, prepared)
+		blindedToken, state, err := client.Blind(dr, prepared)
 		if err != nil {
 			return
 		}
@@ -162,19 +211,27 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 		}
 
 		if resp.StatusCode == http.StatusConflict { // 409 Already Voted
-			resResp, err := http.Get(api.PathResults)
-			if err == nil && resResp.StatusCode == 200 {
-				var resData api.AdminRes
-				json.NewDecoder(resResp.Body).Decode(&resData)
-				resResp.Body.Close()
-				ctx.Dispatch(func(ctx app.Context) {
-					a.Results = resData.Votes
-					a.ShowResults = true
-					a.IsVoting = false
-					a.Message = "You have already voted! Here are the current standings."
-					app.Window().Get("history").Call("replaceState", nil, "", "/") // Hide OTP from URL
-				})
+			ls := app.Window().Get("localStorage")
+			if ls.Truthy() {
+				tokStr := ls.Call("getItem", "vote_token").String()
+				sigStr := ls.Call("getItem", "vote_sig").String()
+				if tokStr != "" && sigStr != "" && tokStr != "null" && sigStr != "null" {
+					tok, err1 := base64.StdEncoding.DecodeString(tokStr)
+					sig, err2 := base64.StdEncoding.DecodeString(sigStr)
+					if err1 == nil && err2 == nil {
+						ctx.Dispatch(func(ctx app.Context) {
+							a.Token = tok
+							a.Signature = sig
+							a.IsVoting = true
+							a.Message = "Session restored. Your vote is untraceable."
+							app.Window().Get("history").Call("replaceState", nil, "", "/")
+						})
+						return
+					}
+				}
 			}
+
+			ctx.Dispatch(func(ctx app.Context) { a.Message = "Link has already been used on another device." })
 			return
 		}
 
@@ -198,6 +255,13 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 		ctx.Dispatch(func(ctx app.Context) {
 			a.Token = prepared
 			a.Signature = signature
+
+			ls := app.Window().Get("localStorage")
+			if ls.Truthy() {
+				ls.Call("setItem", "vote_token", base64.StdEncoding.EncodeToString(prepared))
+				ls.Call("setItem", "vote_sig", base64.StdEncoding.EncodeToString(signature))
+			}
+
 			a.IsVoting = true
 			a.Message = "Authenticated. Your vote is untraceable."
 			app.Window().Get("history").Call("replaceState", nil, "", "/") // Hide OTP from URL
@@ -233,6 +297,12 @@ func (a *MainApp) onVote(ctx app.Context, e app.Event) {
 			json.NewDecoder(resResp.Body).Decode(&resData)
 			resResp.Body.Close()
 			ctx.Dispatch(func(ctx app.Context) {
+				ls := app.Window().Get("localStorage")
+				if ls.Truthy() {
+					ls.Call("removeItem", "vote_token")
+					ls.Call("removeItem", "vote_sig")
+				}
+
 				a.Results = resData.Votes
 				a.ShowResults = true
 				a.IsVoting = false

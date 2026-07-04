@@ -2,10 +2,10 @@ package backend
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
 	"net/smtp"
 	"strings"
@@ -15,14 +15,14 @@ import (
 	"ph-vote/config"
 )
 
-// GenerateOTP creates a simple numeric 6-digit OTP
+// GenerateOTP creates a high-entropy 32-byte magic link secret
 func GenerateOTP() (string, error) {
-	max := big.NewInt(1000000)
-	n, err := rand.Int(rand.Reader, max)
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+	return hex.EncodeToString(b), nil
 }
 
 // SendEmail sends a real email using SMTP configuration
@@ -51,16 +51,18 @@ func HandleRequestMagicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	for _, adminEmail := range config.Current.AdminEmails {
-		if req.Email == adminEmail {
+		if req.Email == strings.ToLower(strings.TrimSpace(adminEmail)) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]bool{"isAdmin": true})
 			return
 		}
 	}
 
-	if !strings.HasSuffix(req.Email, config.Current.AllowedSuffix) {
-		http.Error(w, "Email suffix not allowed", http.StatusForbidden)
+	if !strings.HasSuffix(req.Email, strings.ToLower(strings.TrimSpace(config.Current.AllowedSuffix))) {
+		log.Printf("Suffix check failed: req.Email=%q, allowed=%q", req.Email, config.Current.AllowedSuffix); http.Error(w, "Email suffix not allowed", http.StatusForbidden)
 		return
 	}
 
@@ -100,19 +102,46 @@ func HandleSignToken(w http.ResponseWriter, r *http.Request) {
 	signMutex.Lock()
 	defer signMutex.Unlock()
 
-	err := VerifyAndConsumeOTP(req.OTP)
-	if err == ErrAlreadyVoted {
-		http.Error(w, "already_voted", http.StatusConflict) // 409
-		return
-	} else if err != nil {
+	rec, err := GetOTPRecord(req.OTP)
+	if err != nil {
 		http.Error(w, "Invalid OTP", http.StatusUnauthorized)
 		return
 	}
 
-	sig, err := SignToken(req.BlindedToken)
-	if err != nil {
-		http.Error(w, "Failed to sign token", http.StatusInternalServerError)
-		return
+	reqBlindedHex := hex.EncodeToString(req.BlindedToken)
+
+	var sig []byte
+	if rec.BlindedToken != "" {
+		// Already received a signature
+		if rec.BlindedToken == reqBlindedHex {
+			// Idempotent recovery! Return the saved signature.
+			sig, _ = hex.DecodeString(rec.BlindedSignature)
+			log.Printf("[SignToken] Idempotent recovery for OTP: %s", req.OTP)
+		} else {
+			// Hacked client trying to get a second signature
+			log.Printf("[SignToken] 409 Conflict.\nOTP: %s\nSaved: %s\nReceived: %s", req.OTP, rec.BlindedToken, reqBlindedHex)
+			http.Error(w, "already_voted", http.StatusConflict) // 409
+			return
+		}
+	} else {
+		// New signature request
+		sig, err = SignToken(req.BlindedToken)
+		if err != nil {
+			http.Error(w, "Failed to sign token", http.StatusInternalServerError)
+			return
+		}
+
+		// Save it so it can be recovered later
+		sigHex := hex.EncodeToString(sig)
+		if err := SaveOTPSignature(req.OTP, reqBlindedHex, sigHex); err != nil {
+			http.Error(w, "Failed to save signature", http.StatusInternalServerError)
+			return
+		}
+		
+		// Mark email as having received a signature
+		if err := LogEmailSignature(rec.EmailHash); err != nil {
+			log.Printf("Failed to log email signature: %v", err)
+		}
 	}
 
 	res := api.SignTokenRes{

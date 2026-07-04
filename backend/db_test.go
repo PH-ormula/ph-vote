@@ -17,7 +17,7 @@ func TestDBFeatures(t *testing.T) {
 
 	createTables := `
 	CREATE TABLE IF NOT EXISTS email_logs (email_hash TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-	CREATE TABLE IF NOT EXISTS otps (otp TEXT PRIMARY KEY, email_hash TEXT);
+	CREATE TABLE IF NOT EXISTS otps (otp_hash TEXT PRIMARY KEY, email_hash TEXT, blinded_token TEXT, blinded_signature TEXT);
 	CREATE TABLE IF NOT EXISTS used_tokens (token_hash TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 	CREATE TABLE IF NOT EXISTS votes (id INTEGER PRIMARY KEY AUTOINCREMENT, option TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 	`
@@ -29,7 +29,7 @@ func TestDBFeatures(t *testing.T) {
 	t.Run("ClearDB", func(t *testing.T) {
 		DB.Exec("INSERT INTO votes (option) VALUES ('A')")
 		DB.Exec("INSERT INTO email_logs (email_hash) VALUES ('hash1')")
-		DB.Exec("INSERT INTO otps (otp, email_hash) VALUES ('123', 'hash1')")
+		DB.Exec("INSERT INTO otps (otp_hash, email_hash) VALUES ('123', 'hash1')")
 		DB.Exec("INSERT INTO used_tokens (token_hash) VALUES ('tok1')")
 
 		if err := ClearDB(); err != nil {
@@ -51,7 +51,7 @@ func TestDBFeatures(t *testing.T) {
 		}
 	})
 
-	t.Run("VerifyAndConsumeOTP AlreadyVoted", func(t *testing.T) {
+	t.Run("GetOTPRecord and SaveOTPSignature", func(t *testing.T) {
 		email := "test@example.com"
 		otp := "654321"
 
@@ -59,14 +59,25 @@ func TestDBFeatures(t *testing.T) {
 			t.Fatalf("SetOTP failed: %v", err)
 		}
 
-		err := VerifyAndConsumeOTP(otp)
+		rec, err := GetOTPRecord(otp)
 		if err != nil {
 			t.Fatalf("Expected nil, got %v", err)
 		}
+		if rec.BlindedToken != "" {
+			t.Fatalf("Expected empty blinded token")
+		}
 
-		err = VerifyAndConsumeOTP(otp)
-		if err != ErrAlreadyVoted {
-			t.Fatalf("Expected ErrAlreadyVoted, got %v", err)
+		err = SaveOTPSignature(otp, "blind_tok", "blind_sig")
+		if err != nil {
+			t.Fatalf("SaveOTPSignature failed: %v", err)
+		}
+		
+		rec2, err := GetOTPRecord(otp)
+		if err != nil {
+			t.Fatalf("Expected nil, got %v", err)
+		}
+		if rec2.BlindedToken != "blind_tok" {
+			t.Fatalf("Expected 'blind_tok', got %v", rec2.BlindedToken)
 		}
 	})
 }

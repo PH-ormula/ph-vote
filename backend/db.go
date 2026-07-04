@@ -20,14 +20,23 @@ func InitDB() {
 		log.Fatalf("Failed to open DB: %v", err)
 	}
 
+	// Migration: Drop old otps table if it lacks the blinded_token column
+	var count int
+	err = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('otps') WHERE name='blinded_token'").Scan(&count)
+	if err == nil && count == 0 {
+		DB.Exec("DROP TABLE IF EXISTS otps")
+	}
+
 	createTables := `
 	CREATE TABLE IF NOT EXISTS email_logs (
 		email_hash TEXT PRIMARY KEY,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE TABLE IF NOT EXISTS otps (
-		otp TEXT PRIMARY KEY,
-		email_hash TEXT
+		otp_hash TEXT PRIMARY KEY,
+		email_hash TEXT,
+		blinded_token TEXT,
+		blinded_signature TEXT
 	);
 	CREATE TABLE IF NOT EXISTS used_tokens (
 		token_hash TEXT PRIMARY KEY,
@@ -55,37 +64,47 @@ func HashToken(token []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
+func HashOTP(otp string) string {
+	h := sha256.Sum256([]byte(otp))
+	return hex.EncodeToString(h[:])
+}
+
 // SetOTP stores an OTP for a hashed email
 func SetOTP(otp, email string) error {
-	hash := HashEmail(email)
-	_, err := DB.Exec("INSERT INTO otps (otp, email_hash) VALUES (?, ?)", otp, hash)
+	otpHash := HashOTP(otp)
+	emailHash := HashEmail(email)
+	_, err := DB.Exec("INSERT INTO otps (otp_hash, email_hash, blinded_token, blinded_signature) VALUES (?, ?, '', '')", otpHash, emailHash)
 	return err
 }
 
 var ErrOTPNotFound = errors.New("OTP not found")
 var ErrAlreadyVoted = errors.New("email already voted")
 
-// VerifyAndConsumeOTP checks if OTP exists and is valid. Returns error if invalid or already voted.
-func VerifyAndConsumeOTP(otp string) error {
-	var emailHash string
-	err := DB.QueryRow("SELECT email_hash FROM otps WHERE otp = ?", otp).Scan(&emailHash)
+type OTPRecord struct {
+	EmailHash        string
+	BlindedToken     string
+	BlindedSignature string
+}
+
+func GetOTPRecord(otp string) (*OTPRecord, error) {
+	otpHash := HashOTP(otp)
+	var rec OTPRecord
+	err := DB.QueryRow("SELECT email_hash, blinded_token, blinded_signature FROM otps WHERE otp_hash = ?", otpHash).Scan(&rec.EmailHash, &rec.BlindedToken, &rec.BlindedSignature)
 	if err != nil {
-		return ErrOTPNotFound
+		return nil, ErrOTPNotFound
 	}
+	return &rec, nil
+}
 
-	// Also ensure email hasn't already voted (received signature)
-	var count int
-	_ = DB.QueryRow("SELECT COUNT(*) FROM email_logs WHERE email_hash = ?", emailHash).Scan(&count)
-	if count > 0 {
-		return ErrAlreadyVoted
-	}
+func SaveOTPSignature(otp string, blindedToken string, blindedSignature string) error {
+	otpHash := HashOTP(otp)
+	_, err := DB.Exec("UPDATE otps SET blinded_token = ?, blinded_signature = ? WHERE otp_hash = ?", blindedToken, blindedSignature, otpHash)
+	return err
+}
 
-	// Mark email as having received signature
-	_, _ = DB.Exec("INSERT INTO email_logs (email_hash) VALUES (?)", emailHash)
-	// We don't delete the OTP here so that if they click the link again,
-	// it can still map to their email and correctly identify they've already voted.
-
-	return nil
+func LogEmailSignature(emailHash string) error {
+	_, err := DB.Exec("INSERT OR IGNORE INTO email_logs (email_hash) VALUES (?)", emailHash)
+	return err
 }
 
 func RecordVote(token []byte, option string) error {
