@@ -317,14 +317,17 @@ func (a *MainApp) Render() app.UI {
 			).ElseIf(a.IsVoting,
 				app.Form().OnSubmit(a.onVote).Body(
 					app.P().Class(a.msgClass("dim-text")).Text(a.Message),
-					app.Div().Class("radio-group").Body(
+					app.Div().Class("boxed-list").Body(
 						app.Range(options).Slice(func(i int) app.UI {
 							opt := options[i]
-							return app.Label().Class("radio-label").Body(
+							
+							rowClass := "boxed-list-row"
+							
+							return app.Label().Class(rowClass).Body(
 								app.Input().Type("radio").Name("voteOpt").Value(opt.ID).OnClick(func(ctx app.Context, e app.Event) {
 									a.VoteOption = opt.ID
 								}),
-								app.Div().Body(
+								app.Div().Class("candidate-content").Body(
 									app.Raw(opt.HTML),
 								),
 							)
