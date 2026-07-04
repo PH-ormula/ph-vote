@@ -43,8 +43,14 @@ type AdminRes struct {
 	Votes map[string]int `json:"votes"`
 }
 
+type Candidate struct {
+	ID   string `json:"id" toml:"id"`
+	Name string `json:"name" toml:"name"`
+	HTML string `json:"html" toml:"html"`
+}
+
 type ConfigRes struct {
-	Title     string   `json:"title"`
-	Options   []string `json:"options"`
-	PublicKey []byte   `json:"public_key"`
+	Title     string      `json:"title"`
+	Options   []Candidate `json:"options"`
+	PublicKey []byte      `json:"public_key"`
 }

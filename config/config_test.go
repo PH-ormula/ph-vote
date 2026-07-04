@@ -10,9 +10,18 @@ func TestLoadTOML(t *testing.T) {
 title = "Test Voting"
 baseURL = "http://test.com"
 allowedSuffix = "@test.com"
-options = ["A", "B"]
 adminEmails = ["admin1@test.com", "admin2@test.com"]
 adminPassword = "pass"
+
+[[options]]
+id = "a"
+name = "A"
+html = "<b>A</b>"
+
+[[options]]
+id = "b"
+name = "B"
+html = "<b>B</b>"
 
 [smtp]
 host = "smtp.test.com"
@@ -47,8 +56,8 @@ pass = "testpass"
 	if Current.SMTP.Host != "smtp.test.com" {
 		t.Errorf("Expected SMTP host 'smtp.test.com', got '%s'", Current.SMTP.Host)
 	}
-	if len(Current.Options) != 2 || Current.Options[0] != "A" {
-		t.Errorf("Expected options [A, B], got %v", Current.Options)
+	if len(Current.Options) != 2 || Current.Options[0].Name != "A" || Current.Options[0].ID != "a" {
+		t.Errorf("Expected options with A and B, got %v", Current.Options)
 	}
 	if len(Current.AdminEmails) != 2 || Current.AdminEmails[1] != "admin2@test.com" {
 		t.Errorf("Expected adminEmails [admin1@test.com, admin2@test.com], got %v", Current.AdminEmails)

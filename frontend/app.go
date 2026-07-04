@@ -298,7 +298,7 @@ func (a *MainApp) Render() app.UI {
 		return a.renderAdmin()
 	}
 
-	var options []string
+	var options []api.Candidate
 	if a.Config != nil {
 		options = a.Config.Options
 	}
@@ -321,10 +321,12 @@ func (a *MainApp) Render() app.UI {
 						app.Range(options).Slice(func(i int) app.UI {
 							opt := options[i]
 							return app.Label().Class("radio-label").Body(
-								app.Input().Type("radio").Name("voteOpt").Value(opt).OnClick(func(ctx app.Context, e app.Event) {
-									a.VoteOption = opt
+								app.Input().Type("radio").Name("voteOpt").Value(opt.ID).OnClick(func(ctx app.Context, e app.Event) {
+									a.VoteOption = opt.ID
 								}),
-								app.Span().Text(opt),
+								app.Div().Body(
+									app.Raw(opt.HTML),
+								),
 							)
 						}),
 					),
@@ -374,10 +376,10 @@ func (a *MainApp) renderBarChart(results map[string]int) app.UI {
 	if a.Config != nil {
 		for _, opt := range a.Config.Options {
 			count := 0
-			if val, ok := results[opt]; ok {
+			if val, ok := results[opt.ID]; ok {
 				count = val
 			}
-			votes = append(votes, CandidateVote{Name: opt, Votes: count})
+			votes = append(votes, CandidateVote{Name: opt.Name, Votes: count})
 		}
 	} else {
 		// Fallback if config is not loaded but results exist

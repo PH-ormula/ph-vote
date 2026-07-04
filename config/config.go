@@ -5,17 +5,18 @@ import (
 	"os"
 
 	"github.com/pelletier/go-toml/v2"
+	"ph-vote/api"
 )
 
 // AppConfig maps the JSON config structure
 type AppConfig struct {
-	Title         string   `toml:"title"`
-	BaseURL       string   `toml:"baseURL"`
-	AllowedSuffix string   `toml:"allowedSuffix"`
-	Options       []string `toml:"options"`
-	AdminEmails   []string `toml:"adminEmails"`
-	AdminPassword string   `toml:"adminPassword"`
-	SkipEmail     bool     `toml:"skipEmail"`
+	Title         string          `toml:"title"`
+	BaseURL       string          `toml:"baseURL"`
+	AllowedSuffix string          `toml:"allowedSuffix"`
+	Options       []api.Candidate `toml:"options"`
+	AdminEmails   []string        `toml:"adminEmails"`
+	AdminPassword string          `toml:"adminPassword"`
+	SkipEmail     bool            `toml:"skipEmail"`
 	SMTP          struct {
 		Host string `toml:"host"`
 		Port int    `toml:"port"`
