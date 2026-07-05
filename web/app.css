@@ -126,6 +126,18 @@ body {
     z-index: 1000;
 }
 
+.dialog-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dialog-title {
+    margin: 0;
+    font-size: 20px;
+}
+
 .error-text {
     font-size: 13px;
     text-align: center;
