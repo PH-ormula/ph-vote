@@ -49,6 +49,7 @@ func main() {
 		Name:        config.Current.Title,
 		Description: "Interactive Anonymous Voting",
 		Styles: []string{
+			"/web/mielo.css",
 			"/web/app.css",
 		},
 		Scripts: []string{
