@@ -1,1 +1,1 @@
-- Build all binaries in this project in the ./build/ folder, both wasm and server binaries
+- Build all binaries in this project in the ./build/ folder, both wasm and server binaries, using the commands `GOARCH=wasm GOOS=js go build -o build/app.wasm main_wasm.go` and `go build -o build/server main_server.go`
