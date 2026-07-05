@@ -211,9 +211,14 @@ func HandleResults(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	usedTokens, err := GetUsedTokens()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(api.AdminRes{Votes: votes})
+	json.NewEncoder(w).Encode(api.AdminRes{Votes: votes, UsedTokens: usedTokens})
 }
 
 func HandleAdminClearDB(w http.ResponseWriter, r *http.Request) {

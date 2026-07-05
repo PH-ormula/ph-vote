@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -98,9 +99,32 @@ func (a *MainApp) OnMount(ctx app.Context) {
 								if err1 == nil && err2 == nil {
 									a.Token = tok
 									a.Signature = sig
-									a.IsVoting = true
-									a.Message = "Session restored. Your vote is untraceable."
-									a.Update()
+									ctx.Async(func() {
+										resResp, err := http.Get(api.PathResults)
+										if err == nil && resResp.StatusCode == 200 {
+											var resData api.AdminRes
+											json.NewDecoder(resResp.Body).Decode(&resData)
+											resResp.Body.Close()
+
+											h := sha256.Sum256(tok)
+											tokenHash := hex.EncodeToString(h[:])
+											for _, t := range resData.UsedTokens {
+												if t == tokenHash {
+													ctx.Dispatch(func(ctx app.Context) {
+														a.Results = resData.Votes
+														a.ShowResults = true
+														a.IsVoting = false
+														a.Message = "You have already voted! Here are the current standings."
+													})
+													return
+												}
+											}
+										}
+										ctx.Dispatch(func(ctx app.Context) {
+											a.IsVoting = true
+											a.Message = "Session restored. Your vote is untraceable."
+										})
+									})
 									restored = true
 								}
 							}
@@ -251,7 +275,30 @@ func (a *MainApp) performBlindSignAndShowVote(ctx app.Context, otp string, pubKe
 			return
 		}
 
-		// Success! Save token and signature, show voting UI.
+		// Success! Check if already voted
+		resResp, err := http.Get(api.PathResults)
+		if err == nil && resResp.StatusCode == 200 {
+			var resData api.AdminRes
+			json.NewDecoder(resResp.Body).Decode(&resData)
+			resResp.Body.Close()
+
+			h := sha256.Sum256(prepared)
+			tokenHash := hex.EncodeToString(h[:])
+			for _, t := range resData.UsedTokens {
+				if t == tokenHash {
+					ctx.Dispatch(func(ctx app.Context) {
+						a.Results = resData.Votes
+						a.ShowResults = true
+						a.IsVoting = false
+						a.Message = "You have already voted! Here are the current standings."
+						app.Window().Get("history").Call("replaceState", nil, "", "/") // Hide OTP from URL
+					})
+					return
+				}
+			}
+		}
+
+		// Save token and signature, show voting UI.
 		ctx.Dispatch(func(ctx app.Context) {
 			a.Token = prepared
 			a.Signature = signature

@@ -40,7 +40,8 @@ type AdminReq struct {
 }
 
 type AdminRes struct {
-	Votes map[string]int `json:"votes"`
+	Votes      map[string]int `json:"votes"`
+	UsedTokens []string       `json:"used_tokens"`
 }
 
 type Candidate struct {

@@ -171,3 +171,22 @@ func ClearDB() error {
 	}
 	return nil
 }
+
+// GetUsedTokens returns a list of all used token hashes
+func GetUsedTokens() ([]string, error) {
+	rows, err := DB.Query("SELECT token_hash FROM used_tokens")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var tokenHash string
+		if err := rows.Scan(&tokenHash); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, tokenHash)
+	}
+	return tokens, nil
+}
